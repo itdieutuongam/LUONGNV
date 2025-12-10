@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Hệ Thống Tính Lương (v2 + KPI)</title>
+<style>
+/* --- CSS được giữ phong cách từ file gốc, thêm chút chỉnh sửa cho KPI --- */
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg,#667eea,#764ba2);
+  padding:20px;min-height:100vh;color:#1a202c;
+}
+.container{max-width:1200px;margin:0 auto}
+h1{text-align:center;color:white;margin-bottom:18px;text-shadow:2px 2px 6px rgba(0,0,0,.3)}
+.nav-tabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:18px}
+.nav-tab{padding:10px 14px;background:rgba(255,255,255,.18);color:white;border-radius:10px;cursor:pointer;font-weight:600}
+.nav-tab.active{background:white;color:#5a67d8}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.card{background:white;border-radius:12px;padding:22px;margin-bottom:18px;box-shadow:0 10px 30px rgba(0,0,0,.15)}
+.card h2{color:#5a67d8;margin-bottom:12px}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column}
+.form-group label{font-weight:600;color:#4a5568;margin-bottom:6px;font-size:14px}
+.form-group input, .form-group select, .form-group textarea{padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px}
+.btn{padding:10px 18px;border:none;border-radius:8px;font-weight:700;cursor:pointer;margin:6px}
+.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:white}
+.btn-success{background:#38a169;color:white}
+.btn-warning{background:#ed8936;color:white}
+.btn-danger{background:#e53e3e;color:white}
+.btn-secondary{background:#718096;color:white}
+.table{width:100%;border-collapse:collapse;margin-top:12px}
+.table th,.table td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left}
+.table th{background:#5a67d8;color:white}
+.breakdown{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:12px}
+.break-item{background:linear-gradient(135deg,#667eea,#764ba2);color:white;padding:12px;border-radius:10px;text-align:center}
+.total{background:linear-gradient(135deg,#38a169,#2f855a)}
+.deduction{background:linear-gradient(135deg,#e53e3e,#c53030)}
+.bonus{background:linear-gradient(135deg,#ed8936,#dd6b20)}
+.suggestions{position:absolute;background:white;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px;max-height:140px;overflow:auto;z-index:90;display:none}
+.suggestions.show{display:block}
+.kpi-list{margin-top:10px}
+.kpi-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.kpi-row input{padding:8px}
+.small{font-size:13px;color:#718096}
+.chart{display:flex;align-items:flex-end;gap:14px;height:180px;padding:12px 0}
+.bar-item{flex:1;text-align:center}
+.bar{width:100%;max-width:60px;border-radius:6px 6px 0 0;background:linear-gradient(135deg,#667eea,#764ba2)}
+.media-note{font-size:13px;color:#718096;margin-top:8px}
+.empty-message{text-align:center;color:#718096;padding:24px;font-style:italic}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center;z-index:9999}
+.modal.show{display:flex}
+.modal-content{background:white;padding:20px;border-radius:12px;width:95%;max-width:760px;max-height:90vh;overflow:auto}
+@media print{
+  body{background:white;padding:0}
+  .nav-tabs,.btn{display:none}
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Hệ Thống Tính Lương & KPI — Single File</h1>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="chuyenTab('chamLuong',event)">Chấm Lương</button>
+    <button class="nav-tab" onclick="chuyenTab('danhSach',event)">Danh Sách NV</button>
+    <button class="nav-tab" onclick="chuyenTab('lichSu',event)">Lịch Sử</button>
+    <button class="nav-tab" onclick="chuyenTab('nghiPhep',event)">Nghỉ Phép</button>
+    <button class="nav-tab" onclick="chuyenTab('kpi',event)">KPI / Hệ Số</button>
+    <button class="nav-tab" onclick="chuyenTab('duLieu',event)">Dữ Liệu</button>
+  </div>
+
+  <!-- CHẤM LƯƠNG -->
+  <div id="chamLuong" class="tab-content active">
+    <div class="card">
+      <h2>Thông Tin Nhân Viên</h2>
+      <div class="form-row">
+        <div class="form-group" style="position:relative">
+          <label>Mã Nhân Viên</label>
+          <input id="maNV" oninput="goiYNhanVien('maNV')" placeholder="VD: NV001">
+          <div id="maNV_suggestions" class="suggestions"></div>
+        </div>
+        <div class="form-group" style="position:relative">
+          <label>Họ và Tên</label>
+          <input id="hoTen" oninput="goiYNhanVien('hoTen')" placeholder="Nhập họ tên">
+          <div id="hoTen_suggestions" class="suggestions"></div>
+        </div>
+        <div class="form-group">
+          <label>Chức Vụ</label>
+          <select id="chucVu">
+            <option>Nhân viên</option>
+            <option>Trưởng nhóm</option>
+            <option>Phó phòng</option>
+            <option>Trưởng phòng</option>
+            <option>Giám đốc</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Phòng Ban</label>
+          <select id="phongBan">
+            <option>Kinh doanh</option>
+            <option>Kế toán</option>
+            <option>Nhân sự</option>
+            <option>Kỹ thuật</option>
+            <option>Marketing</option>
+            <option>Sản xuất</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Thông Tin Lương & Chấm Công</h2>
+      <div class="section-title small">Lương cơ bản & Ngày công</div>
+      <div class="form-row">
+        <div class="form-group"><label>Lương Cơ Bản (VNĐ)</label><input type="number" id="luongCoBan" value="10000000"></div>
+        <div class="form-group"><label>Số Ngày Công Chuẩn</label><input type="number" id="ngayCongChuan" value="26"></div>
+        <div class="form-group"><label>Số Ngày Công Thực Tế</label><input type="number" id="ngayCong" value="26"></div>
+        <div class="form-group"><label>Tháng/Năm</label><input type="month" id="thangNam"></div>
+      </div>
+
+      <div class="section-title small">Làm thêm theo ca</div>
+      <div class="form-row">
+        <div class="form-group"><label>Giờ LT Ca Ngày (x1.5)</label><input type="number" id="gioLamThemNgay" value="0"></div>
+        <div class="form-group"><label>Giờ LT Ca Đêm (x1.7)</label><input type="number" id="gioLamThemDem" value="0"></div>
+        <div class="form-group"><label>Giờ LT Ngày Nghỉ(x2.0)</label><input type="number" id="gioLamCuoiTuan" value="0"></div>
+        <div class="form-group"><label>Giờ LT Ngày Lễ (x3.0)</label><input type="number" id="gioLamNgayLe" value="0"></div>
+      </div>
+
+      <div class="section-title small">Phụ cấp & Thưởng</div>
+      <div class="form-row">
+        <div class="form-group"><label>Phụ Cấp Chức Vụ</label><input type="number" id="phuCapChucVu" value="0"></div>
+        <div class="form-group"><label>Phụ Cấp Ăn Trưa</label><input type="number" id="phuCapAn" value="730000"></div>
+        <div class="form-group"><label>Phụ Cấp Xăng</label><input type="number" id="phuCapXe" value="500000"></div>
+        <div class="form-group"><label>Phụ Cấp ĐT</label><input type="number" id="phuCapDienThoai" value="200000"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Phụ Cấp Nhà Ở</label><input type="number" id="phuCapNhaO" value="0"></div>
+        <div class="form-group"><label>Phụ Cấp Độc Hại</label><input type="number" id="phuCapDocHai" value="0"></div>
+        <div class="form-group"><label>Thưởng / Khác</label><input type="number" id="thuongKhac" value="0"></div>
+      </div>
+
+      <div class="section-title small">Thưởng cuối năm</div>
+      <div class="form-row">
+        <div class="form-group"><label>Lương Tháng 13</label><input type="number" id="luongThang13" value="0"></div>
+        <div class="form-group"><label>Thưởng Tết</label><input type="number" id="thuongTet" value="0"></div>
+        <div class="form-group"><label>Thưởng Hiệu Suất</label><input type="number" id="thuongHieuSuat" value="0"></div>
+      </div>
+
+      <div class="section-title small">Khấu trừ & BH</div>
+      <div class="form-row">
+        <div class="form-group"><label>BHXH (%)</label><input type="number" id="bhxh" value="8" step="0.1"></div>
+        <div class="form-group"><label>BHYT (%)</label><input type="number" id="bhyt" value="1.5" step="0.1"></div>
+        <div class="form-group"><label>BHTN (%)</label><input type="number" id="bhtn" value="1" step="0.1"></div>
+        <div class="form-group"><label>Lương Đóng BH</label><input type="number" id="luongDongBH" value="10000000"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Số Người Phụ Thuộc</label><input type="number" id="nguoiPhuThuoc" value="0"></div>
+        <div class="form-group"><label>Tạm Ứng</label><input type="number" id="tamUng" value="0"></div>
+        <div class="form-group"><label>Khấu Trừ Khác</label><input type="number" id="khauTruKhac" value="0"></div>
+      </div>
+
+      <!-- KPI Scores for this employee -->
+      <div class="section-title small">KPI / Điểm đánh giá (áp dụng hệ số)</div>
+      <div id="kpiScoresContainer" class="form-row"></div>
+      <div class="media-note small">Hệ số thưởng hiệu chỉnh theo điểm KPI (x1 = bình thường). Bạn có thể quản lý tiêu chí trong tab KPI.</div>
+
+      <div style="text-align:center;margin-top:12px">
+        <button class="btn btn-primary" onclick="tinhLuong()">Tính Lương</button>
+        <button class="btn btn-success" onclick="themNhanVien()">Thêm / Cập nhật NV</button>
+        <button class="btn btn-warning" onclick="tinhLuongHangLoat()">Tính Lương Hàng Loạt</button>
+        <button class="btn btn-danger" onclick="xoaForm()">Xóa Form</button>
+      </div>
+
+      <div id="ketQuaCard" class="card" style="display:none;margin-top:18px">
+        <h2>Kết Quả</h2>
+        <div id="ketQuaLuong" class="breakdown"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DANH SÁCH -->
+  <div id="danhSach" class="tab-content">
+    <div class="card">
+      <h2>Danh Sách Nhân Viên</h2>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <input id="timKiem" placeholder="Tìm kiếm..." oninput="capNhatDanhSach(this.value)" style="flex:1;padding:10px;border-radius:8px;border:2px solid #e2e8f0">
+        <button class="btn btn-secondary" onclick="xuatCSV()">Xuất CSV</button>
+        <button class="btn btn-sm btn-secondary" onclick="xuatExcel()">Xuất Excel</button>
+      </div>
+      <div class="summary-stats" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">
+        <div class="stat-item card" style="padding:10px"><div class="small">Tổng NV</div><div id="tongNV" style="font-weight:700">0</div></div>
+        <div class="stat-item card" style="padding:10px"><div class="small">Tổng Chi Lương</div><div id="tongLuong">0 đ</div></div>
+        <div class="stat-item card" style="padding:10px"><div class="small">Lương TB</div><div id="luongTB">0 đ</div></div>
+        <div class="stat-item card" style="padding:10px"><div class="small">Cao Nhất</div><div id="luongMax">0 đ</div></div>
+        <div class="stat-item card" style="padding:10px"><div class="small">Thấp Nhất</div><div id="luongMin">0 đ</div></div>
+      </div>
+      <div id="danhSachNV"><p class="empty-message">Chưa có nhân viên</p></div>
+    </div>
+  </div>
+
+  <!-- LỊCH SỬ -->
+  <div id="lichSu" class="tab-content">
+    <div class="card">
+      <h2>Lịch Sử Lương</h2>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+        <select id="locNVLichSu" onchange="capNhatLichSu()"><option value="">Tất cả NV</option></select>
+        <input type="month" id="tuThang" onchange="capNhatLichSu()">
+        <input type="month" id="denThang" onchange="capNhatLichSu()">
+        <button class="btn btn-primary" onclick="capNhatLichSu()">Lọc</button>
+      </div>
+      <div class="card">
+        <h3 class="small">Biểu đồ lương theo tháng</h3>
+        <div id="bieuDoLichSu" class="chart"></div>
+      </div>
+      <div id="bangLichSu" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- NGHỈ PHÉP -->
+  <div id="nghiPhep" class="tab-content">
+    <div class="card">
+      <h2>Quản Lý Nghỉ Phép</h2>
+      <div class="form-row">
+        <div class="form-group"><label>Nhân Viên</label><select id="nvNghiPhep"><option value="">Chọn nhân viên</option></select></div>
+        <div class="form-group"><label>Loại Nghỉ</label><select id="loaiNghi"><option value="phep_nam">Phép năm</option><option value="om">Nghỉ ốm</option><option value="thai_san">Thai sản</option><option value="viec_rieng">Việc riêng</option><option value="le_tet">Lễ/Tết</option></select></div>
+        <div class="form-group"><label>Từ ngày</label><input type="date" id="tuNgayNghi"></div>
+        <div class="form-group"><label>Đến ngày</label><input type="date" id="denNgayNghi"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="grid-column:1/-1"><label>Lý do</label><input id="lyDoNghi"></div>
+      </div>
+      <div style="text-align:left"><button class="btn btn-success" onclick="themNghiPhep()">Đăng ký nghỉ</button></div>
+      <div style="margin-top:12px"><h3 class="small">Danh sách đơn</h3><div id="danhSachNghiPhep"><p class="empty-message">Chưa có đơn</p></div></div>
+      <div style="margin-top:12px"><h3 class="small">Thống kê ngày phép</h3><div id="thongKePhep"></div></div>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div id="kpi" class="tab-content">
+    <div class="card">
+      <h2>Quản lý KPI / Tiêu chí đánh giá</h2>
+      <div class="media-note small">Bạn có thể thêm tiêu chí, đặt trọng số (tổng = 100). Khi tính lương, nhập điểm (0-100) cho từng tiêu chí ở form chấm lương.</div>
+      <div style="margin-top:10px">
+        <div id="kpiList" class="kpi-list"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input id="newKpiName" placeholder="Tên tiêu chí" style="flex:2;padding:8px">
+          <input id="newKpiWeight" placeholder="Trọng số (%)" type="number" style="width:120px;padding:8px">
+          <button class="btn btn-primary" onclick="themKpi()">Thêm tiêu chí</button>
+        </div>
+        <div style="margin-top:12px">
+          <label class="small">Công thức chuyển điểm KPI → hệ số (sử dụng biến <code>score</code> là 0..1):</label>
+          <input id="kpiFormula" style="width:100%;padding:8px;margin-top:6px" value="1 + (score-0.7)*0.3">
+          <div class="small media-note">Ví dụ: <code>1 + (score-0.7)*0.3</code> có nghĩa: điểm 70% → hệ số 1. Điểm cao hơn tăng dần theo hệ số.</div>
+          <div style="margin-top:10px"><button class="btn btn-success" onclick="luuCauHinhKPI()">Lưu cấu hình KPI</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DỮ LIỆU -->
+  <div id="duLieu" class="tab-content">
+    <div class="card">
+      <h2>Nhập / Sao lưu / Khôi phục</h2>
+      <p class="small">File CSV cần cột: Mã NV, Họ Tên, Chức Vụ, Phòng Ban, Lương Cơ Bản, Lương Đóng BH</p>
+      <input type="file" id="fileInput" accept=".csv" onchange="nhapCSV(event)" style="display:none">
+      <label for="fileInput" class="btn btn-primary" style="cursor:pointer;display:inline-block">Chọn File CSV</label>
+      <div id="ketQuaNhap" class="media-note"></div>
+
+      <div style="margin-top:12px">
+        <button class="btn btn-success" onclick="saoLuuDuLieu()">Sao Lưu</button>
+        <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="khoiPhucDuLieu(event)">
+        <label for="restoreFile" class="btn btn-secondary" style="cursor:pointer">Khôi phục từ file</label>
+        <button class="btn btn-danger" onclick="xoaTatCaDuLieu()">Xóa toàn bộ</button>
+      </div>
+
+      <div style="margin-top:12px" class="summary-stats">
+        <div class="card" style="padding:10px"><div class="small">Tổng NV</div><div id="duLieuTongNV">0</div></div>
+        <div class="card" style="padding:10px"><div class="small">Bản ghi lương</div><div id="duLieuTongLuong">0</div></div>
+        <div class="card" style="padding:10px"><div class="small">Đơn nghỉ</div><div id="duLieuTongPhep">0</div></div>
+        <div class="card" style="padding:10px"><div class="small">Dung lượng</div><div id="duLieuDungLuong">0 KB</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal phiếu lương -->
+<div id="modalPhieuLuong" class="modal"><div class="modal-content">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <h3 style="color:#5a67d8">Phiếu Lương</h3>
+    <button onclick="dongModal()" class="btn btn-danger">Đóng</button>
+  </div>
+  <div id="noiDungPhieuLuong"></div>
+  <div style="text-align:right;margin-top:12px"><button class="btn btn-primary" onclick="inPhieuLuong()">In</button></div>
+</div></div>
+
+<script>
+/* ============================
+   Dữ liệu & cấu hình mặc định
+   ============================ */
+let danhSachNhanVien = []; // hiện tại theo tháng
+let danhSachNhanVienDaLuu = []; // hồ sơ nhân viên
+let lichSuLuong = [];
+let danhSachNghiPhep = [];
+const GIAM_TRU_BAN_THAN = 11000000;
+const GIAM_TRU_PHU_THUOC = 4400000;
+const NGAY_PHEP_NAM = 12;
+
+/* KPI cấu hình */
+let kpiCauHinh = {
+  criteria: [], // {id,name,weight}
+  formula: '1 + (score-0.7)*0.3' // score in 0..1
+};
+
+/* ---------------- load / save localStorage ---------------- */
+function luuDuLieu(){
+  const data = { danhSachNhanVien, danhSachNhanVienDaLuu, lichSuLuong, danhSachNghiPhep, kpiCauHinh };
+  localStorage.setItem('luong_app_data_v2', JSON.stringify(data));
+  capNhatDuLieu();
+}
+function taiDuLieu(){
+  try{
+    const raw = localStorage.getItem('luong_app_data_v2');
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    if(data.danhSachNhanVien) danhSachNhanVien = data.danhSachNhanVien;
+    if(data.danhSachNhanVienDaLuu) danhSachNhanVienDaLuu = data.danhSachNhanVienDaLuu;
+    if(data.lichSuLuong) lichSuLuong = data.lichSuLuong;
+    if(data.danhSachNghiPhep) danhSachNghiPhep = data.danhSachNghiPhep;
+    if(data.kpiCauHinh) kpiCauHinh = data.kpiCauHinh;
+  }catch(e){ console.warn('Không thể đọc dữ liệu lưu trữ',e) }
+}
+
+/* ---------------- helper UI & format ---------------- */
+function formatTien(n){ return new Intl.NumberFormat('vi-VN').format(Math.round(n||0)) + ' đ'; }
+function layGiaTri(id){ return parseFloat(document.getElementById(id).value) || 0; }
+function layText(id){ return (document.getElementById(id).value||'').toString().trim(); }
+function laySelectedText(id){ const s = document.getElementById(id); return s.options[s.selectedIndex].text; }
+function escapeHtml(t){ if(!t) return ''; const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
+
+/* ---------------- navigation ---------------- */
+function chuyenTab(tabId,event){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  if(event && event.target) event.target.classList.add('active');
+  if(tabId==='danhSach') capNhatDanhSach();
+  if(tabId==='lichSu') capNhatLichSu();
+  if(tabId==='nghiPhep') capNhatNghiPhep();
+  if(tabId==='kpi') renderKpiList();
+  if(tabId==='chamLuong') renderKpiScoreInputs();
+  if(tabId==='duLieu') capNhatDuLieu();
+}
+
+/* ------------------ Gợi ý nhân viên ------------------ */
+function goiYNhanVien(fieldId){
+  const val = (document.getElementById(fieldId).value||'').toLowerCase();
+  const div = document.getElementById(fieldId + '_suggestions');
+  if(!val){ div.classList.remove('show'); return; }
+  const matches = danhSachNhanVienDaLuu.filter(nv => {
+    if(fieldId==='maNV') return nv.maNV.toLowerCase().includes(val);
+    return nv.hoTen.toLowerCase().includes(val);
+  }).slice(0,8);
+  if(matches.length===0){ div.classList.remove('show'); return; }
+  div.innerHTML = matches.map(m => `<div class="suggestion-item" style="padding:8px;border-bottom:1px solid #eee;cursor:pointer" onclick="chonNhanVien('${escapeHtml(m.maNV)}')"><strong>${escapeHtml(m.maNV)}</strong> - ${escapeHtml(m.hoTen)}</div>`).join('');
+  div.classList.add('show');
+}
+function chonNhanVien(ma){
+  const nv = danhSachNhanVienDaLuu.find(x=>x.maNV===ma);
+  if(!nv) return;
+  document.getElementById('maNV').value = nv.maNV;
+  document.getElementById('hoTen').value = nv.hoTen;
+  document.getElementById('luongCoBan').value = nv.luongCoBan || 0;
+  document.getElementById('luongDongBH').value = nv.luongDongBH || nv.luongCoBan || 0;
+  // đóng gợi ý
+  document.querySelectorAll('.suggestions').forEach(s=>s.classList.remove('show'));
+}
+
+/* ---------------- KPI management ---------------- */
+function renderKpiList(){
+  const container = document.getElementById('kpiList');
+  if(!kpiCauHinh.criteria.length){
+    container.innerHTML = '<p class="empty-message">Chưa có tiêu chí KPI nào.</p>';
+    return;
+  }
+  container.innerHTML = kpiCauHinh.criteria.map(c=>`
+    <div class="kpi-row">
+      <strong style="width:220px">${escapeHtml(c.name)}</strong>
+      <input type="number" value="${c.weight}" min="0" max="100" style="width:120px" onchange="capNhatTrongSo('${c.id}',this.value)">%
+      <button class="btn btn-danger" onclick="xoaKpi('${c.id}')">Xóa</button>
+    </div>
+  `).join('');
+}
+function themKpi(){
+  const name = layText('newKpiName');
+  const w = parseFloat(document.getElementById('newKpiWeight').value)||0;
+  if(!name){ alert('Nhập tên tiêu chí'); return; }
+  const id = 'kpi_' + Date.now();
+  kpiCauHinh.criteria.push({id,name,weight:Math.max(0,Math.min(100,w))});
+  document.getElementById('newKpiName').value=''; document.getElementById('newKpiWeight').value='';
+  renderKpiList(); luuCauHinhKPI();
+}
+function capNhatTrongSo(id,val){
+  const c = kpiCauHinh.criteria.find(x=>x.id===id);
+  if(c){ c.weight = Math.max(0,Math.min(100,parseFloat(val)||0)); renderKpiList(); luuCauHinhKPI(); }
+}
+function xoaKpi(id){
+  if(!confirm('Xóa tiêu chí này?')) return;
+  kpiCauHinh.criteria = kpiCauHinh.criteria.filter(x=>x.id!==id);
+  renderKpiList(); luuCauHinhKPI(); renderKpiScoreInputs();
+}
+function luuCauHinhKPI(){
+  kpiCauHinh.formula = document.getElementById('kpiFormula').value || '1 + (score-0.7)*0.3';
+  // ensure weights sum not necessarily 100 but warn
+  const sum = kpiCauHinh.criteria.reduce((s,c)=>s+(c.weight||0),0);
+  if(sum !== 100) {
+    if(!confirm('Tổng trọng số hiện tại là ' + sum + '%. Tiếp tục lưu? (Khuyến nghị = 100%)')) {
+      return;
+    }
+  }
+  localStorage.setItem('kpi_config_v2', JSON.stringify(kpiCauHinh));
+  alert('Đã lưu cấu hình KPI');
+  luuDuLieu();
+}
+
+/* render inputs for scores on chấm lương form */
+function renderKpiScoreInputs(){
+  const container = document.getElementById('kpiScoresContainer');
+  container.innerHTML = '';
+  if(!kpiCauHinh.criteria || kpiCauHinh.criteria.length===0){
+    container.innerHTML = '<div class="small">Không có tiêu chí KPI. Vui lòng đến tab "KPI" để thêm.</div>';
+    return;
+  }
+  kpiCauHinh.criteria.forEach(c=>{
+    const wrapper = document.createElement('div');
+    wrapper.className = 'form-group';
+    wrapper.innerHTML = `<label>${escapeHtml(c.name)} (trọng số ${c.weight}%)</label><input type="number" id="kpi_score_${c.id}" min="0" max="100" value="100">`;
+    container.appendChild(wrapper);
+  });
+}
+
+/* compute KPI multiplier: evaluate formula string with 'score' variable (0..1) */
+function tinhHeSoKPI(){
+  const criteria = kpiCauHinh.criteria || [];
+  if(criteria.length===0) return 1;
+  const sumWeight = criteria.reduce((s,c)=>s + (c.weight||0),0) || 1;
+  let weightedSum = 0;
+  criteria.forEach(c=>{
+    const score = Math.max(0,Math.min(100,parseFloat(document.getElementById('kpi_score_' + c.id)?.value) || 0));
+    weightedSum += score * (c.weight||0);
+  });
+  // weighted average percentage 0..100
+  const weightedAvg = weightedSum / (sumWeight || 1);
+  const scoreNormalized = weightedAvg / 100; // 0..1
+  // evaluate formula safely-ish:
+  const expr = kpiCauHinh.formula || '1 + (score-0.7)*0.3';
+  try{
+    // allow math functions
+    const fn = new Function('score','Math','return ' + expr + ';');
+    const res = parseFloat(fn(scoreNormalized, Math));
+    if(isFinite(res)) return Math.max(0, res);
+  }catch(e){
+    console.warn('Công thức KPI lỗi',e);
+  }
+  // fallback linear
+  return 1 + (scoreNormalized - 0.7) * 0.3;
+}
+
+/* ------------------ TÍNH LƯƠNG ------------------ */
+function kiemTraDuLieu(){
+  const nc = layGiaTri('ngayCongChuan');
+  if(nc <= 0){ alert('Số ngày công chuẩn phải > 0'); return false; }
+  return true;
+}
+function tinhLuong(){
+  if(!kiemTraDuLieu()) return null;
+  // lấy input
+  const luongCoBan = layGiaTri('luongCoBan');
+  const ngayCongChuan = layGiaTri('ngayCongChuan');
+  const ngayCong = layGiaTri('ngayCong');
+
+  const gioLamThemNgay = layGiaTri('gioLamThemNgay');
+  const gioLamThemDem = layGiaTri('gioLamThemDem');
+  const gioLamCuoiTuan = layGiaTri('gioLamCuoiTuan');
+  const gioLamNgayLe = layGiaTri('gioLamNgayLe');
+
+  const phuCapChucVu = layGiaTri('phuCapChucVu');
+  const phuCapAn = layGiaTri('phuCapAn');
+  const phuCapXe = layGiaTri('phuCapXe');
+  const phuCapDienThoai = layGiaTri('phuCapDienThoai');
+  const phuCapNhaO = layGiaTri('phuCapNhaO');
+  const phuCapDocHai = layGiaTri('phuCapDocHai');
+  const thuongKhac = layGiaTri('thuongKhac');
+
+  const luongThang13 = layGiaTri('luongThang13');
+  const thuongTet = layGiaTri('thuongTet');
+  const thuongHieuSuat = layGiaTri('thuongHieuSuat');
+
+  const bhxhRate = layGiaTri('bhxh') / 100;
+  const bhytRate = layGiaTri('bhyt') / 100;
+  const bhtnRate = layGiaTri('bhtn') / 100;
+  const luongDongBH = layGiaTri('luongDongBH');
+  const nguoiPhuThuoc = layGiaTri('nguoiPhuThuoc');
+  const tamUng = layGiaTri('tamUng');
+  const khauTruKhac = layGiaTri('khauTruKhac');
+
+  const luongTheoNgay = (luongCoBan / ngayCongChuan) * ngayCong;
+  const luongGio = luongCoBan / ngayCongChuan / 8;
+
+  const luongLamThemNgay = gioLamThemNgay * luongGio * 1.5;
+  const luongLamThemDem = gioLamThemDem * luongGio * 2.0;
+  const luongLamCuoiTuan = gioLamCuoiTuan * luongGio * 2.0;
+  const luongLamNgayLe = gioLamNgayLe * luongGio * 3.0;
+  const luongLamThem = luongLamThemNgay + luongLamThemDem + luongLamCuoiTuan + luongLamNgayLe;
+
+  const tongPhuCap = phuCapChucVu + phuCapAn + phuCapXe + phuCapDienThoai + phuCapNhaO + phuCapDocHai + thuongKhac;
+  const tongThuong = luongThang13 + thuongTet + thuongHieuSuat;
+  let tongThuNhap = luongTheoNgay + luongLamThem + tongPhuCap + tongThuong;
+
+  // KPI multiplier
+  const heSoKPI = tinhHeSoKPI();
+  // apply KPI to phần thu nhập (bạn có thể điều chỉnh để áp dụng cho 1 phần, ở đây áp dụng tổng thu nhập trước khấu trừ)
+  tongThuNhap = tongThuNhap * heSoKPI;
+
+  const bhxh = luongDongBH * bhxhRate;
+  const bhyt = luongDongBH * bhytRate;
+  const bhtn = luongDongBH * bhtnRate;
+  const tongBaoHiem = bhxh + bhyt + bhtn;
+
+  const thuNhapChiuThue = tongThuNhap - tongBaoHiem - GIAM_TRU_BAN_THAN - (nguoiPhuThuoc * GIAM_TRU_PHU_THUOC);
+  let thueTNCN = 0;
+  if(thuNhapChiuThue > 0){
+    if(thuNhapChiuThue <= 5000000) thueTNCN = thuNhapChiuThue * 0.05;
+    else if(thuNhapChiuThue <= 10000000) thueTNCN = 250000 + (thuNhapChiuThue - 5000000) * 0.1;
+    else if(thuNhapChiuThue <= 18000000) thueTNCN = 750000 + (thuNhapChiuThue - 10000000) * 0.15;
+    else if(thuNhapChiuThue <= 32000000) thueTNCN = 1950000 + (thuNhapChiuThue - 18000000) * 0.2;
+    else if(thuNhapChiuThue <= 52000000) thueTNCN = 4750000 + (thuNhapChiuThue - 32000000) * 0.25;
+    else if(thuNhapChiuThue <= 80000000) thueTNCN = 9750000 + (thuNhapChiuThue - 52000000) * 0.3;
+    else thueTNCN = 18150000 + (thuNhapChiuThue - 80000000) * 0.35;
+  }
+
+  const tongKhauTru = tongBaoHiem + thueTNCN + tamUng + khauTruKhac;
+  const luongThucNhan = tongThuNhap - tongKhauTru;
+
+  const ketQua = {
+    luongTheoNgay, luongLamThem, luongLamThemNgay, luongLamThemDem, luongLamCuoiTuan, luongLamNgayLe,
+    tongPhuCap, tongThuong, tongThuNhap, bhxh, bhyt, bhtn, tongBaoHiem,
+    thuNhapChiuThue, thueTNCN, tamUng, khauTruKhac, tongKhauTru, luongThucNhan,
+    luongDongBH, ngayCong, gioLamThemNgay, gioLamThemDem, gioLamCuoiTuan, gioLamNgayLe,
+    luongThang13, thuongTet, thuongHieuSuat, heSoKPI
+  };
+
+  hienThiKetQua(ketQua);
+  return ketQua;
+}
+
+function hienThiKetQua(kq){
+  const html = `
+    <div class="break-item"><h3>Lương theo ngày</h3><div>${formatTien(kq.luongTheoNgay)}</div></div>
+    <div class="break-item"><h3>Lương làm thêm</h3><div>${formatTien(kq.luongLamThem)}</div></div>
+    <div class="break-item"><h3>Tổng phụ cấp</h3><div>${formatTien(kq.tongPhuCap)}</div></div>
+    <div class="break-item bonus"><h3>Tổng thưởng</h3><div>${formatTien(kq.tongThuong)}</div></div>
+    <div class="break-item"><h3>Tổng thu nhập (sau KPI x${kq.heSoKPI.toFixed(3)})</h3><div>${formatTien(kq.tongThuNhap)}</div></div>
+    <div class="break-item deduction"><h3>Bảo hiểm</h3><div>-${formatTien(kq.tongBaoHiem)}</div></div>
+    <div class="break-item deduction"><h3>Thuế TNCN</h3><div>-${formatTien(kq.thueTNCN)}</div></div>
+    <div class="break-item deduction"><h3>Tạm ứng & khác</h3><div>-${formatTien(kq.tamUng + kq.khauTruKhac)}</div></div>
+    <div class="break-item total"><h3>LƯƠNG THỰC NHẬN</h3><div style="font-weight:800">${formatTien(kq.luongThucNhan)}</div></div>
+  `;
+  document.getElementById('ketQuaLuong').innerHTML = html;
+  document.getElementById('ketQuaCard').style.display = 'block';
+}
+
+/* ---------------- Thêm nhân viên ---------------- */
+function themNhanVien(){
+  const maNV = layText('maNV'), hoTen = layText('hoTen');
+  if(!maNV || !hoTen){ alert('Nhập Mã NV và Họ Tên'); return; }
+  const ketQua = tinhLuong();
+  if(!ketQua) return;
+  const thangNam = layText('thangNam') || new Date().toISOString().slice(0,7);
+  const nv = {
+    maNV, hoTen, chucVu: laySelectedText('chucVu'), phongBan: laySelectedText('phongBan'),
+    luongCoBan: layGiaTri('luongCoBan'), luongDongBH: layGiaTri('luongDongBH'),
+    ngayCong: ketQua.ngayCong,
+    gioLamThemNgay: ketQua.gioLamThemNgay, gioLamThemDem: ketQua.gioLamThemDem,
+    gioLamCuoiTuan: ketQua.gioLamCuoiTuan, gioLamNgayLe: ketQua.gioLamNgayLe,
+    tongThuNhap: ketQua.tongThuNhap, tongBaoHiem: ketQua.tongBaoHiem,
+    tongThuong: ketQua.tongThuong,
+    thueTNCN: ketQua.thueTNCN, luongThucNhan: ketQua.luongThucNhan,
+    thangNam, ketQua, ngayPhepConLai: NGAY_PHEP_NAM
+  };
+  const idx = danhSachNhanVien.findIndex(x=>x.maNV===maNV);
+  if(idx>=0) danhSachNhanVien[idx]=nv; else danhSachNhanVien.push(nv);
+  const savedIdx = danhSachNhanVienDaLuu.findIndex(x=>x.maNV===maNV);
+  if(savedIdx>=0) danhSachNhanVienDaLuu[savedIdx] = nv; else danhSachNhanVienDaLuu.push(nv);
+  lichSuLuong.push({...nv, id:Date.now(), ngayTao:new Date().toISOString()});
+  luuDuLieu(); capNhatDanhSach(); capNhatDropdowns(); xoaForm();
+  alert('Đã thêm / cập nhật nhân viên!');
+}
+
+/* ---------------- Tính lương hàng loạt ---------------- */
+function tinhLuongHangLoat(){
+  if(danhSachNhanVienDaLuu.length===0){ alert('Chưa có nhân viên trong hệ thống'); return; }
+  const thangNam = layText('thangNam') || new Date().toISOString().slice(0,7);
+  let count = 0;
+  // Lưu trạng thái điểm KPI nếu muốn: hiện dùng giá trị mặc định 100 cho mỗi tiêu chí
+  danhSachNhanVienDaLuu.forEach(nv=>{
+    // đặt form theo nv
+    document.getElementById('maNV').value = nv.maNV;
+    document.getElementById('hoTen').value = nv.hoTen;
+    document.getElementById('luongCoBan').value = nv.luongCoBan || 0;
+    document.getElementById('luongDongBH').value = nv.luongDongBH || nv.luongCoBan || 0;
+    // reset điểm KPI mặc định 100
+    kpiCauHinh.criteria.forEach(c=>{
+      const el = document.getElementById('kpi_score_' + c.id);
+      if(el) el.value = 100;
+    });
+    const kq = tinhLuong();
+    if(kq){
+      const nh = {
+        ...nv,
+        ngayCong: kq.ngayCong,
+        tongThuNhap: kq.tongThuNhap,
+        tongBaoHiem: kq.tongBaoHiem,
+        tongThuong: kq.tongThuong || 0,
+        thueTNCN: kq.thueTNCN,
+        luongThucNhan: kq.luongThucNhan,
+        thangNam,
+        ketQua: kq
+      };
+      let idx = danhSachNhanVien.findIndex(x=>x.maNV===nv.maNV);
+      if(idx>=0) danhSachNhanVien[idx]=nh; else danhSachNhanVien.push(nh);
+      lichSuLuong.push({...nh, id: Date.now() + count, ngayTao:new Date().toISOString()});
+      count++;
+    }
+  });
+  luuDuLieu(); capNhatDanhSach(); xoaForm();
+  alert('Đã tính lương hàng loạt cho ' + count + ' nhân viên tháng ' + (layText('thangNam')||new Date().toISOString().slice(0,7)));
+}
+
+/* ---------------- DANH SÁCH NV ---------------- */
+function capNhatDanhSach(filter=''){
+  const container = document.getElementById('danhSachNV');
+  let ds = filter ? danhSachNhanVien.filter(nv => nv.maNV.toLowerCase().includes(filter.toLowerCase()) || nv.hoTen.toLowerCase().includes(filter.toLowerCase())) : danhSachNhanVien;
+  if(ds.length===0){ container.innerHTML = '<p class="empty-message">Không tìm thấy nhân viên</p>'; }
+  else{
+    let html = `<table class="table"><thead><tr><th>Mã NV</th><th>Họ Tên</th><th>Chức Vụ</th><th>Phòng Ban</th><th>Ngày Công</th><th>Tổng Thu Nhập</th><th>Thực Nhận</th><th>Thao tác</th></tr></thead><tbody>`;
+    ds.forEach((nv,i)=>{
+      const idx = danhSachNhanVien.indexOf(nv);
+      html += `<tr><td>${escapeHtml(nv.maNV)}</td><td>${escapeHtml(nv.hoTen)}</td><td>${escapeHtml(nv.chucVu)}</td><td>${escapeHtml(nv.phongBan)}</td><td>${nv.ngayCong||0}</td><td>${formatTien(nv.tongThuNhap)}</td><td>${formatTien(nv.luongThucNhan)}</td><td><button class="btn btn-secondary" onclick="xemChiTietByIndex(${idx})">Xem</button> <button class="btn btn-primary" onclick="inPhieuLuongByIndex(${idx})">In</button> <button class="btn btn-warning" onclick="suaNhanVienByIndex(${idx})">Sửa</button> <button class="btn btn-danger" onclick="xoaNhanVienByIndex(${idx})">Xóa</button></td></tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+  }
+  const tongNV = danhSachNhanVien.length;
+  const tongLuong = danhSachNhanVien.reduce((s,n)=>s + (n.luongThucNhan||0),0);
+  document.getElementById('tongNV').textContent = tongNV;
+  document.getElementById('tongLuong').textContent = formatTien(tongLuong);
+  document.getElementById('luongTB').textContent = formatTien(tongNV>0?tongLuong/tongNV:0);
+  document.getElementById('luongMax').textContent = formatTien(tongNV>0?Math.max(...danhSachNhanVien.map(n=>n.luongThucNhan||0)):0);
+  document.getElementById('luongMin').textContent = formatTien(tongNV>0?Math.min(...danhSachNhanVien.map(n=>n.luongThucNhan||0)):0);
+}
+
+/* thao tác danh sách */
+function xoaNhanVienByIndex(i){
+  if(!confirm('Xóa nhân viên này?')) return;
+  danhSachNhanVien.splice(i,1); luuDuLieu(); capNhatDanhSach(); capNhatDropdowns();
+}
+function suaNhanVienByIndex(i){
+  const nv = danhSachNhanVien[i];
+  if(!nv) return;
+  chonNhanVien(nv.maNV);
+  document.getElementById('ngayCong').value = nv.ngayCong || 0;
+  chuyenTab('chamLuong');
+}
+function xemChiTietByIndex(i){
+  const nv = danhSachNhanVien[i];
+  if(!nv) return;
+  chuyenTab('chamLuong');
+  hienThiKetQua(nv.ketQua || {});
+  document.getElementById('ketQuaCard').scrollIntoView({behavior:'smooth'});
+}
+function inPhieuLuongByIndex(i){
+  const nv = danhSachNhanVien[i];
+  if(!nv) return;
+  hienThiPhieuLuong(nv);
+}
+
+/* phiếu lương */
+function hienThiPhieuLuong(nv){
+  const kq = nv.ketQua || {};
+  const html = `
+    <div style="padding:8px;border:1px solid #5a67d8;border-radius:8px">
+      <h2 style="text-align:center;color:#5a67d8">PHIẾU LƯƠNG</h2>
+      <p style="text-align:center">Tháng: ${nv.thangNam||'N/A'}</p>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr><td><strong>Mã NV:</strong></td><td>${escapeHtml(nv.maNV)}</td><td><strong>Họ Tên:</strong></td><td>${escapeHtml(nv.hoTen)}</td></tr>
+        <tr><td><strong>Chức Vụ:</strong></td><td>${escapeHtml(nv.chucVu)}</td><td><strong>Phòng Ban:</strong></td><td>${escapeHtml(nv.phongBan)}</td></tr>
+      </table>
+      <table style="width:100%;margin-top:8px;border-collapse:collapse">
+        <tr style="background:#5a67d8;color:white"><th>Khoản</th><th style="text-align:right">Số tiền</th></tr>
+        <tr><td>Lương theo ngày (${nv.ngayCong||0} ngày)</td><td style="text-align:right">${formatTien(kq.luongTheoNgay||0)}</td></tr>
+        <tr><td>Lương làm thêm</td><td style="text-align:right">${formatTien(kq.luongLamThem||0)}</td></tr>
+        <tr><td>Phụ cấp</td><td style="text-align:right">${formatTien(kq.tongPhuCap||0)}</td></tr>
+        ${ (kq.tongThuong||0) > 0 ? `<tr><td>Thưởng</td><td style="text-align:right">${formatTien(kq.tongThuong)}</td></tr>` : '' }
+        <tr style="font-weight:bold;background:#e2e8f0"><td>TỔNG THU NHẬP</td><td style="text-align:right">${formatTien(kq.tongThuNhap||0)}</td></tr>
+        <tr style="background:#e53e3e;color:white"><th>Khoản khấu trừ</th><th style="text-align:right"></th></tr>
+        <tr><td>BHXH/BHYT/BHTN</td><td style="text-align:right">-${formatTien(kq.tongBaoHiem||0)}</td></tr>
+        <tr><td>Thuế TNCN</td><td style="text-align:right">-${formatTien(kq.thueTNCN||0)}</td></tr>
+        <tr><td>Tạm ứng & Khấu trừ khác</td><td style="text-align:right">-${formatTien((kq.tamUng||0)+(kq.khauTruKhac||0))}</td></tr>
+        <tr style="font-weight:bold;background:#e2e8f0"><td>TỔNG KHẤU TRỪ</td><td style="text-align:right">-${formatTien(kq.tongKhauTru||0)}</td></tr>
+        <tr style="font-weight:bold;background:#38a169;color:white"><td>LƯƠNG THỰC NHẬN</td><td style="text-align:right">${formatTien(kq.luongThucNhan||0)}</td></tr>
+      </table>
+    </div>
+  `;
+  document.getElementById('noiDungPhieuLuong').innerHTML = html;
+  document.getElementById('modalPhieuLuong').classList.add('show');
+}
+function dongModal(){ document.getElementById('modalPhieuLuong').classList.remove('show'); }
+function inPhieuLuong(){
+  const content = document.getElementById('noiDungPhieuLuong').innerHTML;
+  const w = window.open('','_blank','width=800,height=700');
+  w.document.write('<html><head><title>Phiếu lương</title><meta charset="utf-8"></head><body>'+content+'</body></html>');
+  w.document.close(); w.print();
+}
+
+/* ---------------- LỊCH SỬ ---------------- */
+function capNhatLichSu(){
+  const maNV = document.getElementById('locNVLichSu').value;
+  const tu = document.getElementById('tuThang').value;
+  const den = document.getElementById('denThang').value;
+  let ds = lichSuLuong.filter(ls=>{
+    if(maNV && ls.maNV!==maNV) return false;
+    if(tu && ls.thangNam < tu) return false;
+    if(den && ls.thangNam > den) return false;
+    return true;
+  });
+  // biểu đồ
+  const agg = {};
+  ds.forEach(ls => { agg[ls.thangNam] = (agg[ls.thangNam]||0) + (ls.luongThucNhan||0); });
+  const months = Object.keys(agg).sort();
+  const bdiv = document.getElementById('bieuDoLichSu');
+  if(months.length===0) bdiv.innerHTML = '<p class="empty-message">Chưa có dữ liệu</p>';
+  else{
+    const max = Math.max(...months.map(m=>agg[m]));
+    bdiv.innerHTML = months.map(m=>{
+      const h = (agg[m]/(max||1))*140;
+      return `<div class="bar-item"><div class="bar" style="height:${h}px"></div><div class="small" style="margin-top:6px">${m}</div><div class="small">${formatTien(agg[m])}</div></div>`;
+    }).join('');
+  }
+  // bảng
+  const tbl = document.getElementById('bangLichSu');
+  if(ds.length===0){ tbl.innerHTML = '<p class="empty-message">Chưa có lịch sử</p>'; return; }
+  let html = `<table class="table"><thead><tr><th>Tháng</th><th>Mã NV</th><th>Họ Tên</th><th>Ngày công</th><th>Tổng thu</th><th>Khấu trừ</th><th>Thực nhận</th></tr></thead><tbody>`;
+  ds.sort((a,b)=>b.thangNam.localeCompare(a.thangNam)).forEach(ls=>{
+    html += `<tr><td>${ls.thangNam}</td><td>${escapeHtml(ls.maNV)}</td><td>${escapeHtml(ls.hoTen)}</td><td>${ls.ngayCong||0}</td><td>${formatTien(ls.tongThuNhap||0)}</td><td>${formatTien((ls.tongBaoHiem||0)+(ls.thueTNCN||0))}</td><td>${formatTien(ls.luongThucNhan||0)}</td></tr>`;
+  });
+  html += '</tbody></table>'; tbl.innerHTML = html;
+}
+
+/* ---------------- NGHỈ PHÉP ---------------- */
+function themNghiPhep(){
+  const maNV = document.getElementById('nvNghiPhep').value;
+  const loai = document.getElementById('loaiNghi').value;
+  const tu = document.getElementById('tuNgayNghi').value;
+  const den = document.getElementById('denNgayNghi').value;
+  const lyDo = document.getElementById('lyDoNghi').value;
+  if(!maNV || !tu || !den){ alert('Nhập đủ thông tin'); return; }
+  const d1 = new Date(tu), d2 = new Date(den);
+  const soNgay = Math.ceil((d2 - d1)/(1000*60*60*24)) + 1;
+  if(soNgay<=0){ alert('Ngày kết thúc phải sau bắt đầu'); return; }
+  const nv = danhSachNhanVienDaLuu.find(x=>x.maNV===maNV);
+  const np = {id:Date.now(), maNV, hoTen: nv?nv.hoTen:'', loaiNghi: loai, loaiNghiText: document.getElementById('loaiNghi').options[document.getElementById('loaiNghi').selectedIndex].text, tuNgay:tu, denNgay:den, soNgay, lyDo, ngayTao:new Date().toISOString()};
+  danhSachNghiPhep.push(np);
+  if(loai==='phep_nam' && nv){
+    const idx = danhSachNhanVienDaLuu.findIndex(x=>x.maNV===maNV);
+    if(idx>=0) danhSachNhanVienDaLuu[idx].ngayPhepConLai = (danhSachNhanVienDaLuu[idx].ngayPhepConLai||NGAY_PHEP_NAM) - soNgay;
+  }
+  luuDuLieu(); capNhatNghiPhep();
+  document.getElementById('tuNgayNghi').value=''; document.getElementById('denNgayNghi').value=''; document.getElementById('lyDoNghi').value='';
+  alert('Đã đăng ký nghỉ phép');
+}
+function xoaNghiPhepById(id){ if(!confirm('Xóa đơn nghỉ?')) return; danhSachNghiPhep = danhSachNghiPhep.filter(x=>x.id!==id); luuDuLieu(); capNhatNghiPhep(); }
+function capNhatNghiPhep(){
+  capNhatDropdowns();
+  const c = document.getElementById('danhSachNghiPhep');
+  if(danhSachNghiPhep.length===0) c.innerHTML='<p class="empty-message">Chưa có đơn nghỉ phép</p>';
+  else{
+    let html = `<table class="table"><thead><tr><th>Mã NV</th><th>Họ Tên</th><th>Loại</th><th>Từ</th><th>Đến</th><th>Số ngày</th><th>Lý do</th><th></th></tr></thead><tbody>`;
+    danhSachNghiPhep.slice().sort((a,b)=>b.tuNgay.localeCompare(a.tuNgay)).forEach(np=>{
+      html += `<tr><td>${escapeHtml(np.maNV)}</td><td>${escapeHtml(np.hoTen)}</td><td>${escapeHtml(np.loaiNghiText)}</td><td>${np.tuNgay}</td><td>${np.denNgay}</td><td>${np.soNgay}</td><td>${escapeHtml(np.lyDo)}</td><td><button class="btn btn-danger" onclick="xoaNghiPhepById(${np.id})">Xóa</button></td></tr>`;
+    });
+    html += '</tbody></table>';
+    c.innerHTML = html;
+  }
+  // thống kê phép
+  const t = document.getElementById('thongKePhep');
+  if(danhSachNhanVienDaLuu.length===0) t.innerHTML='<p class="empty-message">Chưa có nhân viên</p>';
+  else{
+    let html = `<table class="table"><thead><tr><th>Mã NV</th><th>Họ Tên</th><th>Phép năm</th><th>Đã dùng</th><th>Còn lại</th></tr></thead><tbody>`;
+    danhSachNhanVienDaLuu.forEach(nv=>{
+      const da = danhSachNghiPhep.filter(np=>np.maNV===nv.maNV && np.loaiNghi==='phep_nam').reduce((s,x)=>s+x.soNgay,0);
+      const con = NGAY_PHEP_NAM - da;
+      html += `<tr><td>${escapeHtml(nv.maNV)}</td><td>${escapeHtml(nv.hoTen)}</td><td>${NGAY_PHEP_NAM}</td><td><span style="background:#fed7d7;padding:4px;border-radius:8px">${da} ngày</span></td><td><span style="background:#c6f6d5;padding:4px;border-radius:8px">${con} ngày</span></td></tr>`;
+    });
+    html += '</tbody></table>';
+    t.innerHTML = html;
+  }
+}
+
+/* ---------------- BẢO CÀI & IMPORT/EXPORT ---------------- */
+function saoLuuDuLieu(){
+  const data = { danhSachNhanVien, danhSachNhanVienDaLuu, lichSuLuong, danhSachNghiPhep, kpiCauHinh, ngaySaoLuu: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sao_luu_luong_' + new Date().toISOString().slice(0,10) + '.json'; a.click();
+  alert('Đã sao lưu dữ liệu');
+}
+function khoiPhucDuLieu(event){
+  const f = event.target.files[0]; if(!f) return;
+  if(!confirm('Khôi phục sẽ ghi đè dữ liệu hiện tại. Tiếp tục?')){ event.target.value=''; return; }
+  const r = new FileReader();
+  r.onload = e => {
+    try{
+      const data = JSON.parse(e.target.result);
+      if(data.danhSachNhanVien) danhSachNhanVien = data.danhSachNhanVien;
+      if(data.danhSachNhanVienDaLuu) danhSachNhanVienDaLuu = data.danhSachNhanVienDaLuu;
+      if(data.lichSuLuong) lichSuLuong = data.lichSuLuong;
+      if(data.danhSachNghiPhep) danhSachNghiPhep = data.danhSachNghiPhep;
+      if(data.kpiCauHinh) kpiCauHinh = data.kpiCauHinh;
+      luuDuLieu(); capNhatDanhSach(); capNhatDropdowns(); capNhatDuLieu();
+      alert('Khôi phục thành công');
+    }catch(err){ alert('File không hợp lệ'); }
+  };
+  r.readAsText(f); event.target.value='';
+}
+function xoaTatCaDuLieu(){
+  if(!confirm('BẠN CÓ CHẮC? Hành động này không thể hoàn tác')) return;
+  localStorage.removeItem('luong_app_data_v2');
+  localStorage.removeItem('kpi_config_v2');
+  danhSachNhanVien = []; danhSachNhanVienDaLuu = []; lichSuLuong = []; danhSachNghiPhep = []; kpiCauHinh = {criteria:[],formula:'1 + (score-0.7)*0.3'};
+  capNhatDanhSach(); capNhatDropdowns(); capNhatDuLieu(); renderKpiList(); renderKpiScoreInputs();
+  alert('Đã xóa toàn bộ dữ liệu');
+}
+
+/* CSV import (đơn giản) */
+function nhapCSV(event){
+  const f = event.target.files[0]; if(!f) return;
+  if(!f.name.toLowerCase().endsWith('.csv')){ document.getElementById('ketQuaNhap').innerHTML = '<span style="color:red">Chọn file CSV</span>'; event.target.value=''; return;}
+  const r = new FileReader();
+  r.onload = e => {
+    const text = e.target.result;
+    const lines = text.split(/\r?\n/).filter(l=>l.trim());
+    if(lines.length < 2){ document.getElementById('ketQuaNhap').innerHTML = '<span style="color:red">File không có dữ liệu</span>'; return;}
+    let count=0, errors=[];
+    for(let i=1;i<lines.length;i++){
+      const cols = parseCSVLine(lines[i]);
+      if(cols.length >= 2){
+        const nv = {
+          maNV: cols[0] || 'NV' + (danhSachNhanVienDaLuu.length + count + 1),
+          hoTen: cols[1] || 'Chưa tên',
+          chucVu: cols[2] || 'Nhân viên',
+          phongBan: cols[3] || 'Chưa phân loại',
+          luongCoBan: parseFloat(cols[4]) || 10000000,
+          luongDongBH: parseFloat(cols[5]) || parseFloat(cols[4]) || 10000000,
+          ngayPhepConLai: NGAY_PHEP_NAM
+        };
+        const ex = danhSachNhanVienDaLuu.findIndex(x=>x.maNV===nv.maNV);
+        if(ex>=0) danhSachNhanVienDaLuu[ex] = Object.assign({},danhSachNhanVienDaLuu[ex], nv);
+        else danhSachNhanVienDaLuu.push(nv);
+        count++;
+      } else if(cols.length>0 && cols[0]) errors.push('Dòng ' + (i+1) + ' thiếu dữ liệu');
+    }
+    luuDuLieu(); capNhatDropdowns(); document.getElementById('ketQuaNhap').innerHTML = `<span style="color:green">Đã nhập ${count} nhân viên</span>` + (errors.length?('<div style="color:orange">'+errors.slice(0,5).join(', ')+'</div>'):'');
+  };
+  r.readAsText(f); event.target.value='';
+}
+/* simple CSV parse supporting quoted commas */
+function parseCSVLine(line){
+  const result=[]; let cur=''; let inQ=false;
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if(ch==='\"'){ inQ = !inQ; continue; }
+    if(ch===',' && !inQ){ result.push(cur.trim()); cur=''; continue; }
+    cur += ch;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+/* export CSV/Excel */
+function xuatCSV(){
+  if(danhSachNhanVien.length===0){ alert('Không có dữ liệu'); return; }
+  let csv = '\uFEFFSTT,Mã NV,Họ Tên,Chức Vụ,Phòng Ban,Lương Cơ Bản,Ngày Công,Tổng Thu Nhập,Bảo Hiểm,Thuế TNCN,Thưởng,Lương Thực Nhận\n';
+  danhSachNhanVien.forEach((nv,i)=> csv += `${i+1},"${nv.maNV}","${nv.hoTen}","${nv.chucVu}","${nv.phongBan}",${nv.luongCoBan},${nv.ngayCong||0},${Math.round(nv.tongThuNhap||0)},${Math.round(nv.tongBaoHiem||0)},${Math.round(nv.thueTNCN||0)},${Math.round(nv.tongThuong||0)},${Math.round(nv.luongThucNhan||0)}\n`);
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='bang_luong_' + new Date().toISOString().slice(0,10) + '.csv'; a.click();
+}
+function xuatExcel(){
+  if(danhSachNhanVien.length===0){ alert('Không có dữ liệu'); return; }
+  let html = `<html><head><meta charset="utf-8"></head><body><table border="1"><tr style="background:#5a67d8;color:white"><th>STT</th><th>Mã NV</th><th>Họ Tên</th><th>Chức Vụ</th><th>Phòng Ban</th><th>Lương Cơ Bản</th><th>Ngày Công</th><th>Tổng Thu Nhập</th><th>Bảo Hiểm</th><th>Thuế</th><th>Thưởng</th><th>Thực Nhận</th></tr>`;
+  danhSachNhanVien.forEach((nv,i)=> html += `<tr><td>${i+1}</td><td>${escapeHtml(nv.maNV)}</td><td>${escapeHtml(nv.hoTen)}</td><td>${escapeHtml(nv.chucVu)}</td><td>${escapeHtml(nv.phongBan)}</td><td>${nv.luongCoBan}</td><td>${nv.ngayCong||0}</td><td>${Math.round(nv.tongThuNhap||0)}</td><td>${Math.round(nv.tongBaoHiem||0)}</td><td>${Math.round(nv.thueTNCN||0)}</td><td>${Math.round(nv.tongThuong||0)}</td><td>${Math.round(nv.luongThucNhan||0)}</td></tr>`);
+  html += `</table></body></html>`;
+  const blob = new Blob([html], {type:'application/vnd.ms-excel'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='bang_luong_' + new Date().toISOString().slice(0,10) + '.xls'; a.click();
+}
+
+/* ---------------- utilities & init ---------------- */
+function capNhatDropdowns(){
+  const nvNghi = document.getElementById('nvNghiPhep');
+  const loc = document.getElementById('locNVLichSu');
+  const old1 = nvNghi.value || '';
+  const old2 = loc.value || '';
+  nvNghi.innerHTML = '<option value="">Chọn nhân viên</option>';
+  loc.innerHTML = '<option value="">Tất cả NV</option>';
+  danhSachNhanVienDaLuu.forEach(nv=>{
+    nvNghi.innerHTML += `<option value="${escapeHtml(nv.maNV)}">${escapeHtml(nv.maNV)} - ${escapeHtml(nv.hoTen)}</option>`;
+    loc.innerHTML += `<option value="${escapeHtml(nv.maNV)}">${escapeHtml(nv.maNV)} - ${escapeHtml(nv.hoTen)}</option>`;
+  });
+  nvNghi.value = old1; loc.value = old2;
+}
+function capNhatDuLieu(){
+  document.getElementById('duLieuTongNV').textContent = danhSachNhanVienDaLuu.length;
+  document.getElementById('duLieuTongLuong').textContent = lichSuLuong.length;
+  document.getElementById('duLieuTongPhep').textContent = danhSachNghiPhep.length;
+  const data = JSON.stringify({danhSachNhanVien, danhSachNhanVienDaLuu, lichSuLuong, danhSachNghiPhep});
+  const bytes = new Blob([data]).size;
+  document.getElementById('duLieuDungLuong').textContent = (bytes/1024).toFixed(2) + ' KB';
+}
+
+/* clear form */
+function xoaForm(){
+  document.getElementById('maNV').value=''; document.getElementById('hoTen').value='';
+  document.getElementById('chucVu').selectedIndex = 0; document.getElementById('phongBan').selectedIndex=0;
+  document.getElementById('luongCoBan').value='10000000'; document.getElementById('ngayCongChuan').value='26'; document.getElementById('ngayCong').value='26';
+  ['gioLamThemNgay','gioLamThemDem','gioLamCuoiTuan','gioLamNgayLe','phuCapChucVu','phuCapAn','phuCapXe','phuCapDienThoai','phuCapNhaO','phuCapDocHai','thuongKhac','luongThang13','thuongTet','thuongHieuSuat','tamUng','khauTruKhac'].forEach(id=>document.getElementById(id).value='0');
+  renderKpiScoreInputs();
+  document.getElementById('ketQuaCard').style.display = 'none';
+}
+
+/* load saved KPI config if any */
+function loadKpiFromStorage(){
+  try{
+    const raw = localStorage.getItem('kpi_config_v2'); if(!raw) return;
+    const data = JSON.parse(raw); if(data) kpiCauHinh = data;
+    if(kpiCauHinh.formula) document.getElementById('kpiFormula').value = kpiCauHinh.formula;
+  }catch(e){ console.warn(e) }
+}
+
+/* onclick outside suggestions closes them */
+document.addEventListener('click', function(e){ if(!e.target.closest('.form-group')) document.querySelectorAll('.suggestions').forEach(s=>s.classList.remove('show')); });
+
+/* init */
+function initApp(){
+  taiDuLieu();
+  loadKpiFromStorage();
+  // default month
+  const now=new Date(); document.getElementById('thangNam').value = now.toISOString().slice(0,7);
+  document.getElementById('tuThang').value = new Date(now.getFullYear(),0).toISOString().slice(0,7);
+  document.getElementById('denThang').value = now.toISOString().slice(0,7);
+  renderKpiList(); renderKpiScoreInputs(); capNhatDropdowns(); capNhatDanhSach(); capNhatDuLieu();
+}
+/* khai báo sẵn hàm để gọi từ HTML */
+window.tinhLuong = tinhLuong;
+window.themNhanVien = themNhanVien;
+window.tinhLuongHangLoat = tinhLuongHangLoat;
+window.xoaForm = xoaForm;
+window.tinhHeSoKPI = tinhHeSoKPI;
+window.luuCauHinhKPI = luuCauHinhKPI;
+window.themKpi = themKpi;
+window.nhapCSV = nhapCSV;
+window.saoLuuDuLieu = saoLuuDuLieu;
+window.khoiPhucDuLieu = khoiPhucDuLieu;
+window.xoaTatCaDuLieu = xoaTatCaDuLieu;
+window.xuatCSV = xuatCSV;
+window.xuatExcel = xuatExcel;
+window.themNghiPhep = themNghiPhep;
+window.capNhatNghiPhep = capNhatNghiPhep;
+window.xemChiTietByIndex = xemChiTietByIndex;
+window.inPhieuLuongByIndex = inPhieuLuongByIndex;
+window.suaNhanVienByIndex = suaNhanVienByIndex;
+window.xoaNhanVienByIndex = xoaNhanVienByIndex;
+window.chuyenTab = chuyenTab;
+window.goiYNhanVien = goiYNhanVien;
+window.chonNhanVien = chonNhanVien;
+window.capNhatLichSu = capNhatLichSu;
+window.capNhatDanhSach = capNhatDanhSach;
+window.capNhatDropdowns = capNhatDropdowns;
+window.capNhatDuLieu = capNhatDuLieu;
+window.renderKpiScoreInputs = renderKpiScoreInputs;
+window.renderKpiList = renderKpiList;
+window.luuDuLieu = luuDuLieu;
+window.saoLuuDuLieu = saoLuuDuLieu;
+window.dongModal = dongModal;
+window.inPhieuLuong = inPhieuLuong;
+
+/* start */
+initApp();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chấm Bảng Lương Nhân Viên</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; color: white; margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+        .nav-tab {
+            padding: 12px 25px; background: rgba(255,255,255,0.2); color: white; border: none;
+            border-radius: 10px 10px 0 0; cursor: pointer; font-size: 16px; font-weight: 600; transition: all 0.3s;
+        }
+        .nav-tab:hover { background: rgba(255,255,255,0.3); }
+        .nav-tab.active { background: white; color: #5a67d8; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .card { background: white; border-radius: 15px; padding: 25px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .card h2 { color: #5a67d8; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; position: relative; }
+        .form-group label { font-weight: 600; color: #4a5568; margin-bottom: 5px; font-size: 14px; }
+        .form-group input, .form-group select {
+            padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #5a67d8; }
+        .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 2px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px; max-height: 150px; overflow-y: auto; z-index: 100; display: none; }
+        .suggestions.show { display: block; }
+        .suggestion-item { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #e2e8f0; }
+        .suggestion-item:hover { background: #f7fafc; }
+        .btn { padding: 12px 30px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; margin: 5px; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
+        .btn-danger { background: #e53e3e; color: white; }
+        .btn-success { background: #38a169; color: white; }
+        .btn-secondary { background: #718096; color: white; }
+        .btn-group { text-align: center; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #5a67d8; color: white; font-weight: 600; }
+        tr:hover { background: #f7fafc; }
+        .salary-breakdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-top: 15px; }
+        .breakdown-item { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 10px; text-align: center; }
+        .breakdown-item h3 { font-size: 13px; opacity: 0.9; margin-bottom: 8px; }
+        .breakdown-item .amount { font-size: 18px; font-weight: bold; }
+        .total-salary { background: linear-gradient(135deg, #38a169 0%, #2f855a 100%); }
+        .deduction { background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%); }
+        .action-btn { padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; margin: 2px; }
+        .view-btn { background: #4299e1; color: white; }
+        .edit-btn { background: #ed8936; color: white; }
+        .delete-btn { background: #e53e3e; color: white; }
+        .empty-message { text-align: center; color: #718096; padding: 40px; font-style: italic; }
+        .summary-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-item { background: #f7fafc; padding: 15px; border-radius: 10px; text-align: center; }
+        .stat-item h4 { color: #718096; font-size: 12px; margin-bottom: 5px; }
+        .stat-item .value { color: #5a67d8; font-size: 18px; font-weight: bold; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 15px; }
+        .search-box input { flex: 1; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
+        .filter-group { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+        .filter-group select { padding: 10px 15px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
+        .chart-container { background: #f7fafc; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .bar-chart { display: flex; align-items: flex-end; gap: 20px; height: 200px; padding: 20px 0; }
+        .bar-item { flex: 1; display: flex; flex-direction: column; align-items: center; }
+        .bar { width: 100%; max-width: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 5px 5px 0 0; }
+        .bar-label { margin-top: 10px; font-size: 11px; color: #4a5568; text-align: center; }
+        .bar-value { font-size: 10px; color: #718096; margin-bottom: 5px; }
+        .section-title { font-size: 14px; font-weight: 600; color: #5a67d8; margin: 15px 0 10px 0; padding-bottom: 5px; border-bottom: 1px solid #e2e8f0; }
+        @media print { body { background: white; padding: 0; } .nav-tabs, .btn-group, .action-btn, .search-box, .filter-group { display: none !important; } .card { box-shadow: none; border: 1px solid #e2e8f0; } }
+        @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } .nav-tab { padding: 10px 15px; font-size: 14px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chấm Bảng Lương Nhân Viên</h1>
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="chuyenTab('chamLuong')">Chấm Lương</button>
+            <button class="nav-tab" onclick="chuyenTab('danhSach')">Danh Sách Nhân Viên</button>
+            <button class="nav-tab" onclick="chuyenTab('baoCao')">Báo Cáo</button>
+        </div>
+
+        <div id="chamLuong" class="tab-content active">
+            <div class="card">
+                <h2>Thông Tin Nhân Viên</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mã Nhân Viên</label>
+                        <input type="text" id="maNV" placeholder="VD: NV001" oninput="goiYNhanVien('maNV')">
+                        <div class="suggestions" id="maNV_suggestions"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Họ và Tên</label>
+                        <input type="text" id="hoTen" placeholder="Nhập họ tên" oninput="goiYNhanVien('hoTen')">
+                        <div class="suggestions" id="hoTen_suggestions"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Chức Vụ</label>
+                        <select id="chucVu">
+                            <option value="nhan_vien">Nhân viên</option>
+                            <option value="truong_nhom">Trưởng nhóm</option>
+                            <option value="pho_phong">Phó phòng</option>
+                            <option value="truong_phong">Trưởng phòng</option>
+                            <option value="giam_doc">Giám đốc</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Phòng Ban</label>
+                        <select id="phongBan">
+                            <option value="kinh_doanh">Kinh doanh</option>
+                            <option value="ke_toan">Kế toán</option>
+                            <option value="nhan_su">Nhân sự</option>
+                            <option value="ky_thuat">Kỹ thuật</option>
+                            <option value="marketing">Marketing</option>
+                            <option value="san_xuat">Sản xuất</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Thông Tin Chấm Công & Lương</h2>
+                <div class="section-title">Lương cơ bản & Ngày công</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Lương Cơ Bản (VNĐ)</label>
+                        <input type="number" id="luongCoBan" value="10000000">
+                    </div>
+                    <div class="form-group">
+                        <label>Số Ngày Công Chuẩn</label>
+                        <input type="number" id="ngayCongChuan" value="26" min="1" max="31">
+                    </div>
+                    <div class="form-group">
+                        <label>Số Ngày Công Thực Tế</label>
+                        <input type="number" id="ngayCong" value="26" min="0" max="31">
+                    </div>
+                    <div class="form-group">
+                        <label>Số Giờ Làm Thêm</label>
+                        <input type="number" id="gioLamThem" value="0" min="0">
+                    </div>
+                </div>
+
+                <div class="section-title">Các Khoản Phụ Cấp</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phụ Cấp Chức Vụ (VNĐ)</label>
+                        <input type="number" id="phuCapChucVu" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Phụ Cấp Ăn Trưa (VNĐ)</label>
+                        <input type="number" id="phuCapAn" value="730000">
+                    </div>
+                    <div class="form-group">
+                        <label>Phụ Cấp Xăng Xe (VNĐ)</label>
+                        <input type="number" id="phuCapXe" value="500000">
+                    </div>
+                    <div class="form-group">
+                        <label>Phụ Cấp Điện Thoại (VNĐ)</label>
+                        <input type="number" id="phuCapDienThoai" value="200000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Phụ Cấp Nhà Ở (VNĐ)</label>
+                        <input type="number" id="phuCapNhaO" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Phụ Cấp Độc Hại (VNĐ)</label>
+                        <input type="number" id="phuCapDocHai" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Thưởng / Phụ Cấp Khác (VNĐ)</label>
+                        <input type="number" id="thuongKhac" value="0">
+                    </div>
+                </div>
+
+                <div class="section-title">Các Khoản Khấu Trừ</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>BHXH (% lương đóng BH)</label>
+                        <input type="number" id="bhxh" value="8" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>BHYT (% lương đóng BH)</label>
+                        <input type="number" id="bhyt" value="1.5" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>BHTN (% lương đóng BH)</label>
+                        <input type="number" id="bhtn" value="1" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label>Lương Đóng Bảo Hiểm (VNĐ)</label>
+                        <input type="number" id="luongDongBH" value="10000000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Số Người Phụ Thuộc</label>
+                        <input type="number" id="nguoiPhuThuoc" value="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Tạm Ứng (VNĐ)</label>
+                        <input type="number" id="tamUng" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Khấu Trừ Khác (VNĐ)</label>
+                        <input type="number" id="khauTruKhac" value="0">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="tinhLuong()">Tính Lương</button>
+                <button class="btn btn-success" onclick="themNhanVien()">Thêm Vào Danh Sách</button>
+                <button class="btn btn-danger" onclick="xoaForm()">Xóa Form</button>
+            </div>
+
+            <div class="card" id="ketQuaCard" style="display: none;">
+                <h2>Kết Quả Tính Lương</h2>
+                <div class="salary-breakdown" id="ketQuaLuong"></div>
+            </div>
+        </div>
+
+        <div id="danhSach" class="tab-content">
+            <div class="card">
+                <h2>Danh Sách Nhân Viên</h2>
+                <div class="search-box">
+                    <input type="text" id="timKiem" placeholder="Tìm kiếm theo mã NV hoặc họ tên..." oninput="timKiemNhanVien()">
+                </div>
+                <div class="summary-stats">
+                    <div class="stat-item"><h4>Tổng Nhân Viên</h4><div class="value" id="tongNV">0</div></div>
+                    <div class="stat-item"><h4>Tổng Lương Chi Trả</h4><div class="value" id="tongLuong">0 đ</div></div>
+                    <div class="stat-item"><h4>Lương Trung Bình</h4><div class="value" id="luongTB">0 đ</div></div>
+                    <div class="stat-item"><h4>Lương Cao Nhất</h4><div class="value" id="luongMax">0 đ</div></div>
+                    <div class="stat-item"><h4>Lương Thấp Nhất</h4><div class="value" id="luongMin">0 đ</div></div>
+                </div>
+                <div id="danhSachNV"><p class="empty-message">Chưa có nhân viên nào trong danh sách</p></div>
+            </div>
+        </div>
+
+        <div id="baoCao" class="tab-content">
+            <div class="card">
+                <h2>Báo Cáo Tổng Hợp</h2>
+                <div class="filter-group">
+                    <select id="locPhongBan" onchange="capNhatBaoCao()">
+                        <option value="">Tất cả phòng ban</option>
+                        <option value="Kinh doanh">Kinh doanh</option>
+                        <option value="Kế toán">Kế toán</option>
+                        <option value="Nhân sự">Nhân sự</option>
+                        <option value="Kỹ thuật">Kỹ thuật</option>
+                        <option value="Marketing">Marketing</option>
+                        <option value="Sản xuất">Sản xuất</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="inBaoCao()">In Báo Cáo</button>
+                    <button class="btn btn-primary" onclick="xuatCSV()">Xuất CSV</button>
+                </div>
+                <div class="chart-container">
+                    <h3 style="margin-bottom: 15px; color: #4a5568;">Biểu đồ lương theo phòng ban</h3>
+                    <div class="bar-chart" id="bieuDoPhongBan"></div>
+                </div>
+                <div class="summary-stats">
+                    <div class="stat-item"><h4>Tổng Nhân Viên</h4><div class="value" id="baoCaoTongNV">0</div></div>
+                    <div class="stat-item"><h4>Tổng Chi Phí Lương</h4><div class="value" id="baoCaoTongLuong">0 đ</div></div>
+                    <div class="stat-item"><h4>Tổng Bảo Hiểm</h4><div class="value" id="baoCaoTongBH">0 đ</div></div>
+                </div>
+                <div id="bangBaoCao"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let danhSachNhanVien = [];
+        let danhSachNhanVienDaLuu = [];
+        const GIAM_TRU_BAN_THAN = 11000000;
+        const GIAM_TRU_PHU_THUOC = 4400000;
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        function formatTien(so) { return new Intl.NumberFormat('vi-VN').format(Math.round(so)) + ' đ'; }
+        function layGiaTri(id) { return parseFloat(document.getElementById(id).value) || 0; }
+        function layText(id) { return document.getElementById(id).value.trim(); }
+        function laySelectedText(id) { const s = document.getElementById(id); return s.options[s.selectedIndex].text; }
+
+        function chuyenTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+            if (tabId === 'baoCao') capNhatBaoCao();
+        }
+
+        function goiYNhanVien(fieldId) {
+            const input = document.getElementById(fieldId);
+            const value = input.value.toLowerCase().trim();
+            const suggestionsDiv = document.getElementById(fieldId + '_suggestions');
+            if (!value) { suggestionsDiv.classList.remove('show'); return; }
+            let matches = danhSachNhanVienDaLuu.filter(nv => 
+                fieldId === 'maNV' ? nv.maNV.toLowerCase().includes(value) : nv.hoTen.toLowerCase().includes(value)
+            );
+            if (matches.length > 0) {
+                suggestionsDiv.innerHTML = matches.map(nv => `<div class="suggestion-item" onclick="chonNhanVien('${escapeHtml(nv.maNV)}')"><strong>${escapeHtml(nv.maNV)}</strong> - ${escapeHtml(nv.hoTen)}</div>`).join('');
+                suggestionsDiv.classList.add('show');
+            } else { suggestionsDiv.classList.remove('show'); }
+        }
+
+        function chonNhanVien(maNV) {
+            const nv = danhSachNhanVienDaLuu.find(n => n.maNV === maNV);
+            if (nv) {
+                document.getElementById('maNV').value = nv.maNV;
+                document.getElementById('hoTen').value = nv.hoTen;
+                document.getElementById('luongCoBan').value = nv.luongCoBan;
+                document.getElementById('luongDongBH').value = nv.luongDongBH || nv.luongCoBan;
+                const chucVuSelect = document.getElementById('chucVu');
+                for (let i = 0; i < chucVuSelect.options.length; i++) {
+                    if (chucVuSelect.options[i].text === nv.chucVu) { chucVuSelect.selectedIndex = i; break; }
+                }
+                const phongBanSelect = document.getElementById('phongBan');
+                for (let i = 0; i < phongBanSelect.options.length; i++) {
+                    if (phongBanSelect.options[i].text === nv.phongBan) { phongBanSelect.selectedIndex = i; break; }
+                }
+            }
+            document.querySelectorAll('.suggestions').forEach(s => s.classList.remove('show'));
+        }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.form-group')) document.querySelectorAll('.suggestions').forEach(s => s.classList.remove('show'));
+        });
+
+        function kiemTraDuLieu() {
+            const ngayCongChuan = layGiaTri('ngayCongChuan');
+            if (ngayCongChuan <= 0) { alert('Số ngày công chuẩn phải lớn hơn 0!'); return false; }
+            return true;
+        }
+
+        function tinhLuong() {
+            if (!kiemTraDuLieu()) return null;
+
+            const luongCoBan = layGiaTri('luongCoBan');
+            const ngayCongChuan = layGiaTri('ngayCongChuan');
+            const ngayCong = layGiaTri('ngayCong');
+            const gioLamThem = layGiaTri('gioLamThem');
+            
+            const phuCapChucVu = layGiaTri('phuCapChucVu');
+            const phuCapAn = layGiaTri('phuCapAn');
+            const phuCapXe = layGiaTri('phuCapXe');
+            const phuCapDienThoai = layGiaTri('phuCapDienThoai');
+            const phuCapNhaO = layGiaTri('phuCapNhaO');
+            const phuCapDocHai = layGiaTri('phuCapDocHai');
+            const thuongKhac = layGiaTri('thuongKhac');
+            
+            const bhxhRate = layGiaTri('bhxh') / 100;
+            const bhytRate = layGiaTri('bhyt') / 100;
+            const bhtnRate = layGiaTri('bhtn') / 100;
+            const luongDongBH = layGiaTri('luongDongBH');
+            const nguoiPhuThuoc = layGiaTri('nguoiPhuThuoc');
+            const tamUng = layGiaTri('tamUng');
+            const khauTruKhac = layGiaTri('khauTruKhac');
+
+            const luongTheoNgay = (luongCoBan / ngayCongChuan) * ngayCong;
+            const luongGio = luongCoBan / ngayCongChuan / 8;
+            const luongLamThem = gioLamThem * luongGio * 1.5;
+            const tongPhuCap = phuCapChucVu + phuCapAn + phuCapXe + phuCapDienThoai + phuCapNhaO + phuCapDocHai + thuongKhac;
+            const tongThuNhap = luongTheoNgay + luongLamThem + tongPhuCap;
+            
+            const bhxh = luongDongBH * bhxhRate;
+            const bhyt = luongDongBH * bhytRate;
+            const bhtn = luongDongBH * bhtnRate;
+            const tongBaoHiem = bhxh + bhyt + bhtn;
+            
+            const thuNhapChiuThue = tongThuNhap - tongBaoHiem - GIAM_TRU_BAN_THAN - (nguoiPhuThuoc * GIAM_TRU_PHU_THUOC);
+            let thueTNCN = 0;
+            if (thuNhapChiuThue > 0) {
+                if (thuNhapChiuThue <= 5000000) thueTNCN = thuNhapChiuThue * 0.05;
+                else if (thuNhapChiuThue <= 10000000) thueTNCN = 250000 + (thuNhapChiuThue - 5000000) * 0.1;
+                else if (thuNhapChiuThue <= 18000000) thueTNCN = 750000 + (thuNhapChiuThue - 10000000) * 0.15;
+                else if (thuNhapChiuThue <= 32000000) thueTNCN = 1950000 + (thuNhapChiuThue - 18000000) * 0.2;
+                else if (thuNhapChiuThue <= 52000000) thueTNCN = 4750000 + (thuNhapChiuThue - 32000000) * 0.25;
+                else if (thuNhapChiuThue <= 80000000) thueTNCN = 9750000 + (thuNhapChiuThue - 52000000) * 0.3;
+                else thueTNCN = 18150000 + (thuNhapChiuThue - 80000000) * 0.35;
+            }
+            
+            const tongKhauTru = tongBaoHiem + thueTNCN + tamUng + khauTruKhac;
+            const luongThucNhan = tongThuNhap - tongKhauTru;
+
+            const ketQua = { luongTheoNgay, luongLamThem, tongPhuCap, tongThuNhap, bhxh, bhyt, bhtn, tongBaoHiem, thuNhapChiuThue, thueTNCN, tamUng, khauTruKhac, tongKhauTru, luongThucNhan, luongDongBH, ngayCong, gioLamThem };
+            hienThiKetQua(ketQua);
+            return ketQua;
+        }
+
+        function hienThiKetQua(kq) {
+            document.getElementById('ketQuaLuong').innerHTML = `
+                <div class="breakdown-item"><h3>Lương Theo Ngày Công</h3><div class="amount">${formatTien(kq.luongTheoNgay)}</div></div>
+                <div class="breakdown-item"><h3>Lương Làm Thêm</h3><div class="amount">${formatTien(kq.luongLamThem)}</div></div>
+                <div class="breakdown-item"><h3>Tổng Phụ Cấp</h3><div class="amount">${formatTien(kq.tongPhuCap)}</div></div>
+                <div class="breakdown-item"><h3>Tổng Thu Nhập</h3><div class="amount">${formatTien(kq.tongThuNhap)}</div></div>
+                <div class="breakdown-item deduction"><h3>Bảo Hiểm (${((kq.tongBaoHiem/kq.luongDongBH)*100).toFixed(1)}%)</h3><div class="amount">-${formatTien(kq.tongBaoHiem)}</div></div>
+                <div class="breakdown-item deduction"><h3>Thuế TNCN</h3><div class="amount">-${formatTien(kq.thueTNCN)}</div></div>
+                <div class="breakdown-item deduction"><h3>Tạm Ứng & Khấu Trừ Khác</h3><div class="amount">-${formatTien(kq.tamUng + kq.khauTruKhac)}</div></div>
+                <div class="breakdown-item total-salary"><h3>LƯƠNG THỰC NHẬN</h3><div class="amount">${formatTien(kq.luongThucNhan)}</div></div>
+            `;
+            document.getElementById('ketQuaCard').style.display = 'block';
+        }
+
+        function themNhanVien() {
+            const maNV = layText('maNV'), hoTen = layText('hoTen');
+            if (!maNV || !hoTen) { alert('Vui lòng nhập đầy đủ Mã NV và Họ Tên!'); return; }
+            const ketQua = tinhLuong();
+            if (!ketQua) return;
+            
+            const nhanVien = {
+                maNV, hoTen, chucVu: laySelectedText('chucVu'), phongBan: laySelectedText('phongBan'),
+                luongCoBan: layGiaTri('luongCoBan'), luongDongBH: layGiaTri('luongDongBH'),
+                ngayCong: ketQua.ngayCong, gioLamThem: ketQua.gioLamThem,
+                tongThuNhap: ketQua.tongThuNhap, tongBaoHiem: ketQua.tongBaoHiem,
+                thueTNCN: ketQua.thueTNCN, luongThucNhan: ketQua.luongThucNhan, ketQua
+            };
+
+            let index = danhSachNhanVien.findIndex(nv => nv.maNV === maNV);
+            if (index >= 0) danhSachNhanVien[index] = nhanVien; else danhSachNhanVien.push(nhanVien);
+            
+            let savedIndex = danhSachNhanVienDaLuu.findIndex(nv => nv.maNV === maNV);
+            if (savedIndex >= 0) danhSachNhanVienDaLuu[savedIndex] = nhanVien; else danhSachNhanVienDaLuu.push(nhanVien);
+
+            luuDuLieu(); capNhatDanhSach(); xoaForm();
+            alert('Đã thêm/cập nhật nhân viên thành công!');
+        }
+
+        function xoaNhanVienByIndex(index) {
+            if (confirm('Bạn có chắc muốn xóa nhân viên này?')) {
+                danhSachNhanVien.splice(index, 1); luuDuLieu(); capNhatDanhSach();
+            }
+        }
+
+        function suaNhanVienByIndex(index) {
+            const nv = danhSachNhanVien[index];
+            if (nv) { chonNhanVien(nv.maNV); document.getElementById('ngayCong').value = nv.ngayCong; chuyenTab('chamLuong'); document.querySelector('.nav-tab').click(); }
+        }
+
+        function xemChiTietByIndex(index) {
+            const nv = danhSachNhanVien[index];
+            if (nv) { chuyenTab('chamLuong'); document.querySelector('.nav-tab').click(); hienThiKetQua(nv.ketQua); document.getElementById('ketQuaCard').scrollIntoView({ behavior: 'smooth' }); }
+        }
+
+        function timKiemNhanVien() { capNhatDanhSach(document.getElementById('timKiem').value.toLowerCase().trim()); }
+
+        function capNhatDanhSach(tuKhoa = '') {
+            const container = document.getElementById('danhSachNV');
+            let ds = tuKhoa ? danhSachNhanVien.filter(nv => nv.maNV.toLowerCase().includes(tuKhoa) || nv.hoTen.toLowerCase().includes(tuKhoa)) : danhSachNhanVien;
+            
+            if (ds.length === 0) { container.innerHTML = '<p class="empty-message">Không tìm thấy nhân viên nào</p>'; }
+            else {
+                let html = `<table><thead><tr><th>Mã NV</th><th>Họ Tên</th><th>Chức Vụ</th><th>Phòng Ban</th><th>Ngày Công</th><th>Tổng Thu Nhập</th><th>Lương Thực Nhận</th><th>Thao Tác</th></tr></thead><tbody>`;
+                ds.forEach((nv, i) => {
+                    const realIndex = danhSachNhanVien.indexOf(nv);
+                    html += `<tr><td>${escapeHtml(nv.maNV)}</td><td>${escapeHtml(nv.hoTen)}</td><td>${escapeHtml(nv.chucVu)}</td><td>${escapeHtml(nv.phongBan)}</td><td>${nv.ngayCong}</td><td>${formatTien(nv.tongThuNhap)}</td><td>${formatTien(nv.luongThucNhan)}</td><td><button class="action-btn view-btn" onclick="xemChiTietByIndex(${realIndex})">Xem</button><button class="action-btn edit-btn" onclick="suaNhanVienByIndex(${realIndex})">Sửa</button><button class="action-btn delete-btn" onclick="xoaNhanVienByIndex(${realIndex})">Xóa</button></td></tr>`;
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            }
+
+            const tongNV = danhSachNhanVien.length;
+            const tongLuong = danhSachNhanVien.reduce((s, nv) => s + nv.luongThucNhan, 0);
+            document.getElementById('tongNV').textContent = tongNV;
+            document.getElementById('tongLuong').textContent = formatTien(tongLuong);
+            document.getElementById('luongTB').textContent = formatTien(tongNV > 0 ? tongLuong / tongNV : 0);
+            document.getElementById('luongMax').textContent = formatTien(tongNV > 0 ? Math.max(...danhSachNhanVien.map(nv => nv.luongThucNhan)) : 0);
+            document.getElementById('luongMin').textContent = formatTien(tongNV > 0 ? Math.min(...danhSachNhanVien.map(nv => nv.luongThucNhan)) : 0);
+        }
+
+        function capNhatBaoCao() {
+            const locPhongBan = document.getElementById('locPhongBan').value;
+            let ds = locPhongBan ? danhSachNhanVien.filter(nv => nv.phongBan === locPhongBan) : danhSachNhanVien;
+
+            const tongNV = ds.length;
+            const tongLuong = ds.reduce((s, nv) => s + nv.luongThucNhan, 0);
+            const tongBH = ds.reduce((s, nv) => s + nv.tongBaoHiem, 0);
+
+            document.getElementById('baoCaoTongNV').textContent = tongNV;
+            document.getElementById('baoCaoTongLuong').textContent = formatTien(tongLuong);
+            document.getElementById('baoCaoTongBH').textContent = formatTien(tongBH);
+
+            const luongTheoPhongBan = {};
+            danhSachNhanVien.forEach(nv => { luongTheoPhongBan[nv.phongBan] = (luongTheoPhongBan[nv.phongBan] || 0) + nv.luongThucNhan; });
+            const maxLuong = Math.max(...Object.values(luongTheoPhongBan), 1);
+            const bieuDoContainer = document.getElementById('bieuDoPhongBan');
+            
+            if (Object.keys(luongTheoPhongBan).length > 0) {
+                bieuDoContainer.innerHTML = Object.entries(luongTheoPhongBan).map(([pb, luong]) => {
+                    const height = (luong / maxLuong) * 150;
+                    return `<div class="bar-item"><div class="bar-value">${formatTien(luong)}</div><div class="bar" style="height: ${height}px;"></div><div class="bar-label">${escapeHtml(pb)}</div></div>`;
+                }).join('');
+            } else { bieuDoContainer.innerHTML = '<p style="text-align:center;color:#718096;">Chưa có dữ liệu</p>'; }
+
+            const bangBaoCao = document.getElementById('bangBaoCao');
+            if (ds.length > 0) {
+                let html = `<table><thead><tr><th>STT</th><th>Mã NV</th><th>Họ Tên</th><th>Phòng Ban</th><th>Tổng Thu Nhập</th><th>Bảo Hiểm</th><th>Thuế TNCN</th><th>Thực Nhận</th></tr></thead><tbody>`;
+                ds.forEach((nv, i) => {
+                    html += `<tr><td>${i + 1}</td><td>${escapeHtml(nv.maNV)}</td><td>${escapeHtml(nv.hoTen)}</td><td>${escapeHtml(nv.phongBan)}</td><td>${formatTien(nv.tongThuNhap)}</td><td>${formatTien(nv.tongBaoHiem)}</td><td>${formatTien(nv.thueTNCN)}</td><td>${formatTien(nv.luongThucNhan)}</td></tr>`;
+                });
+                html += `<tr style="font-weight:bold;background:#e2e8f0;"><td colspan="4">TỔNG CỘNG</td><td>${formatTien(ds.reduce((s,nv)=>s+nv.tongThuNhap,0))}</td><td>${formatTien(tongBH)}</td><td>${formatTien(ds.reduce((s,nv)=>s+nv.thueTNCN,0))}</td><td>${formatTien(tongLuong)}</td></tr></tbody></table>`;
+                bangBaoCao.innerHTML = html;
+            } else { bangBaoCao.innerHTML = '<p class="empty-message">Không có dữ liệu</p>'; }
+        }
+
+        function inBaoCao() { window.print(); }
+
+        function xuatCSV() {
+            if (danhSachNhanVien.length === 0) { alert('Không có dữ liệu!'); return; }
+            let csv = '\uFEFF' + 'STT,Mã NV,Họ Tên,Chức Vụ,Phòng Ban,Lương Cơ Bản,Ngày Công,Tổng Thu Nhập,Bảo Hiểm,Thuế TNCN,Lương Thực Nhận\n';
+            danhSachNhanVien.forEach((nv, i) => {
+                csv += `${i+1},"${nv.maNV}","${nv.hoTen}","${nv.chucVu}","${nv.phongBan}",${nv.luongCoBan},${nv.ngayCong},${Math.round(nv.tongThuNhap)},${Math.round(nv.tongBaoHiem)},${Math.round(nv.thueTNCN)},${Math.round(nv.luongThucNhan)}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'bang_luong_' + new Date().toISOString().slice(0,10) + '.csv';
+            link.click();
+        }
+
+        function xoaForm() {
+            document.getElementById('maNV').value = '';
+            document.getElementById('hoTen').value = '';
+            document.getElementById('chucVu').selectedIndex = 0;
+            document.getElementById('phongBan').selectedIndex = 0;
+            document.getElementById('luongCoBan').value = '10000000';
+            document.getElementById('ngayCongChuan').value = '26';
+            document.getElementById('ngayCong').value = '26';
+            document.getElementById('gioLamThem').value = '0';
+            document.getElementById('phuCapChucVu').value = '0';
+            document.getElementById('phuCapAn').value = '730000';
+            document.getElementById('phuCapXe').value = '500000';
+            document.getElementById('phuCapDienThoai').value = '200000';
+            document.getElementById('phuCapNhaO').value = '0';
+            document.getElementById('phuCapDocHai').value = '0';
+            document.getElementById('thuongKhac').value = '0';
+            document.getElementById('bhxh').value = '8';
+            document.getElementById('bhyt').value = '1.5';
+            document.getElementById('bhtn').value = '1';
+            document.getElementById('luongDongBH').value = '10000000';
+            document.getElementById('nguoiPhuThuoc').value = '0';
+            document.getElementById('tamUng').value = '0';
+            document.getElementById('khauTruKhac').value = '0';
+            document.getElementById('ketQuaCard').style.display = 'none';
+        }
+
+        function luuDuLieu() {
+            localStorage.setItem('danhSachNhanVien', JSON.stringify(danhSachNhanVien));
+            localStorage.setItem('danhSachNhanVienDaLuu', JSON.stringify(danhSachNhanVienDaLuu));
+        }
+
+        function taiDuLieu() {
+            const saved = localStorage.getItem('danhSachNhanVien');
+            const savedAll = localStorage.getItem('danhSachNhanVienDaLuu');
+            if (saved) danhSachNhanVien = JSON.parse(saved);
+            if (savedAll) danhSachNhanVienDaLuu = JSON.parse(savedAll);
+        }
+
+        taiDuLieu();
+        capNhatDanhSach();
+    </script>
+</body>
+</html>
